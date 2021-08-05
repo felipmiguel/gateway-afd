@@ -20,8 +20,8 @@ public class AdfPredicatesConfig {
         return new LoggingRoutePredicateFactory();
     }
 
-    // @Bean
-    // public AfdAddressResolver afdResolver(){
-    //     return new AfdAddressResolverImpl();
-    // }
+    @Bean
+    public AfdAddressResolver afdResolver(){
+        return new AfdAddressResolverImpl();
+    }
 }

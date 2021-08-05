@@ -1,0 +1,17 @@
+{"properties": [
+  {
+    "name": "azurespringcloud.max-age-minutes",
+    "type": "java.lang.Integer",
+    "description": "Number of minutes to cache the list of IPs"
+  },
+  {
+    "name": "azurespringcloud.cloud-type",
+    "type": "java.lang.String",
+    "description": "Cloud type: Azure, AzureGov, GermanyGov, China"
+  },
+  {
+    "name": "azurespringcloud.service-type",
+    "type": "java.lang.String",
+    "description": "Service type to discover the address list. By default 'AzureFrontDoor.Backend'"
+  }
+]}

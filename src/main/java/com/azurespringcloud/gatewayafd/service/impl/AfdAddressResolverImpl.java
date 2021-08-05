@@ -5,10 +5,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.security.InvalidParameterException;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,18 +22,45 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
-@Service
 public class AfdAddressResolverImpl implements AfdAddressResolver {
 
     private ObjectMapper mapper = new ObjectMapper();
 
     private Log logger = LogFactory.getLog(AfdAddressResolver.class);
 
+    @Value("${azurespringcloud.cloud-type:Azure}")
+    private String cloud;
+    @Value("${azurespringcloud.max-age-minutes:720}")
+    private Integer maxAgeInMinutes;
+
+    @Value("${azurespringcloud.service-type:AzureFrontDoor.Backend}")
+    private String serviceType;
+
+    private List<String> savedAddressList;
+    private OffsetDateTime lastRetrieval;
+
     @Override
     public List<String> getAfdAddresses(CloudType cloudType) throws IOException {
-        
+        if (lastRetrieval == null || savedAddressList == null) {
+            logger.info("Retrieving the list for the first time");
+            savedAddressList = retrieveAddresses(cloudType);
+            lastRetrieval = OffsetDateTime.now();
+        }
+        if (lastRetrieval != null) {
+            if (lastRetrieval.plusMinutes(maxAgeInMinutes).isBefore(OffsetDateTime.now())) {
+                logger.info("The last retrieval was at " + lastRetrieval + ". Retrieving the list.");
+                List<String> list = retrieveAddresses(cloudType);
+                savedAddressList = list;
+                lastRetrieval = OffsetDateTime.now();
+            }
+        }
+        return savedAddressList;
+    }
+
+    private List<String> retrieveAddresses(CloudType cloudType)
+            throws IOException, JsonParseException, JsonMappingException {
         String downloadPageUrl = getDownloadUrl(cloudType);
         logger.info(String.format("searching into %s to get the address list source", downloadPageUrl));
         String tagListUrl = extractDownloadPageUrl(downloadPageUrl);
@@ -41,12 +68,18 @@ public class AfdAddressResolverImpl implements AfdAddressResolver {
         return downloadAddressList(tagListUrl);
     }
 
+    @Override
+    public List<String> getAfdAddresses() throws IOException {
+        CloudType cloudType = CloudType.valueOf(this.cloud);
+        return getAfdAddresses(cloudType);
+    }
+
     private List<String> downloadAddressList(String sourceUrl)
             throws JsonParseException, JsonMappingException, IOException {
 
         ServiceTagList tagList = this.retrieveObject(sourceUrl, ServiceTagList.class);
         Optional<ServiceTag> frontDoorBackend = tagList.getValues().stream()
-                .filter(serviceTag -> serviceTag.getName().equals("AzureFrontDoor.Backend")).findFirst();
+                .filter(serviceTag -> serviceTag.getName().equals(serviceType)).findFirst();
         if (frontDoorBackend.isPresent()) {
             return frontDoorBackend.get().getProperties().getAddressPrefixes();
         }

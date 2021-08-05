@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.function.Predicate;
 
 import com.azurespringcloud.gatewayafd.service.AfdAddressResolver;
-import com.azurespringcloud.gatewayafd.service.impl.AfdAddressResolverImpl;
 import com.azurespringcloud.gatewayafd.service.model.CloudType;
 
 import org.apache.commons.logging.Log;
@@ -138,13 +137,9 @@ public class XForwardedRemoteAddrRoutePredicateFactory
         // represents the last reverse proxy that was used when calling the gateway.
         private int maxTrustedIndex = 1;
 
-        // private static final AfdAddressResolver addressResolver = new AfdAddressResolverImpl();
-
         Log logger = LogFactory.getLog(Config.class);
 
         private List<String> sources = null;
-        private OffsetDateTime retrieved;
-        private long maxAgeMinutes = 720; // every 12 hours
 
         public int getMaxTrustedIndex() {
             return this.maxTrustedIndex;
@@ -155,43 +150,6 @@ public class XForwardedRemoteAddrRoutePredicateFactory
             return this;
         }
 
-        public long getMaxAgeMinutes() {
-            return this.maxAgeMinutes;
-        }
-
-        public Config setMaxAgeMinutes(long minutes) {
-            this.maxAgeMinutes = minutes;
-            return this;
-        }
-
-        // public List<String> getSources() {
-        // if (retrieved == null || sources == null) {
-        // try {
-        // sources = addressResolver.getAfdAddresses(CloudType.Azure);
-        // } catch (IOException e) {
-        // logger.error("Cannot retrieve a new list of addresses", e);
-        // return null;
-        // }
-        // retrieved = OffsetDateTime.now();
-        // return sources;
-        // }
-        // if (retrieved != null) {
-        // if (retrieved.plusMinutes(maxAgeMinutes).isBefore(OffsetDateTime.now())) {
-        // try {
-        // sources = addressResolver.getAfdAddresses(CloudType.Azure);
-        // } catch (IOException e) {
-        // // if it failed, but there is already a list just use it
-        // logger.error("Cannot retrieve a new list of addresses", e);
-        // }
-        // retrieved = OffsetDateTime.now();
-        // return sources;
-        // } else {
-        // return sources;
-        // }
-        // }
-        // return sources;
-        // }
-
         public List<String> getSources() {
             return this.sources;
         }
@@ -201,9 +159,9 @@ public class XForwardedRemoteAddrRoutePredicateFactory
             return this;
         }
 
-        // public Configf setSources(String... sources) {
-        // this.sources = Arrays.asList(sources);
-        // return this;
-        // }
+        public Config setSources(String... sources) {
+            this.sources = Arrays.asList(sources);
+            return this;
+        }
     }
 }
