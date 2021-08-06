@@ -22,7 +22,7 @@ import org.springframework.web.server.ServerWebExchange;
 public class AzureServiceTagRemoteAddrRoutePredicateFactory
         extends AbstractRoutePredicateFactory<AzureServiceTagRemoteAddrRoutePredicateFactory.Config> {
 
-    private static final Log log = LogFactory.getLog(XForwardedRemoteAddrRoutePredicateFactory.class);
+    private static final Log log = LogFactory.getLog(AzureServiceTagRemoteAddrRoutePredicateFactory.class);
 
     @Autowired
     AzureServicesAddressResolver addressResolver;
@@ -47,7 +47,7 @@ public class AzureServiceTagRemoteAddrRoutePredicateFactory
         }
 
         if (log.isDebugEnabled()) {
-            log.debug("Applying XForwardedRemoteAddr route predicate with maxTrustedIndex of "
+            log.debug("Applying Azure Service Tag route predicate with maxTrustedIndex of "
                     + config.getMaxTrustedIndex() + " for " + serviceSources.size() + " source(s)");
         }
 
