@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.util.List;
 
-import com.azurespringcloud.gatewayafd.service.AfdAddressResolver;
+import com.azurespringcloud.gatewayafd.service.AzureServicesAddressResolver;
 import com.azurespringcloud.gatewayafd.service.model.CloudType;
 
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 class GatewayAfdApplicationTests {
 
 	@Autowired
-	AfdAddressResolver addressResolver;
+	AzureServicesAddressResolver addressResolver;
 
 	@Test
 	void contextLoads() {
@@ -27,7 +27,7 @@ class GatewayAfdApplicationTests {
 
 	@Test
 	void resolveAdfAddresses_AzurePublic() throws IOException{
-		List<String> addresses = addressResolver.getAfdAddresses(CloudType.Azure);
+		List<String> addresses = addressResolver.getServiceAddresses(CloudType.Azure, "AzureFrontDoor.Backend");
 		assertNotNull(addresses);
 		assertNotEquals(0, addresses.size());
 		

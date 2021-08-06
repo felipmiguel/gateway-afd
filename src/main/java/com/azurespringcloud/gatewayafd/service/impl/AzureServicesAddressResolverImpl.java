@@ -8,83 +8,79 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.security.InvalidParameterException;
-import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
-import com.azurespringcloud.gatewayafd.service.AfdAddressResolver;
+import com.azurespringcloud.gatewayafd.service.AzureServicesAddressResolver;
 import com.azurespringcloud.gatewayafd.service.model.CloudType;
 import com.azurespringcloud.gatewayafd.service.model.ServiceTag;
 import com.azurespringcloud.gatewayafd.service.model.ServiceTagList;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Value;
 
-public class AfdAddressResolverImpl implements AfdAddressResolver {
+public class AzureServicesAddressResolverImpl implements AzureServicesAddressResolver {
 
-    private ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    private Log logger = LogFactory.getLog(AfdAddressResolver.class);
+    private Log logger = LogFactory.getLog(AzureServicesAddressResolver.class);
 
-    @Value("${azurespringcloud.cloud-type:Azure}")
-    private String cloud;
-    @Value("${azurespringcloud.max-age-minutes:720}")
-    private Integer maxAgeInMinutes;
+    private final LoadingCache<ServiceCacheKey, List<String>> addressesCache;
+    private final LoadingCache<CloudType, ServiceTagList> tagListCache;
 
-    @Value("${azurespringcloud.service-type:AzureFrontDoor.Backend}")
-    private String serviceType;
-
-    private List<String> savedAddressList;
-    private OffsetDateTime lastRetrieval;
-
-    @Override
-    public List<String> getAfdAddresses(CloudType cloudType) throws IOException {
-        if (lastRetrieval == null || savedAddressList == null) {
-            logger.info("Retrieving the list for the first time");
-            savedAddressList = retrieveAddresses(cloudType);
-            lastRetrieval = OffsetDateTime.now();
-        }
-        if (lastRetrieval != null) {
-            if (lastRetrieval.plusMinutes(maxAgeInMinutes).isBefore(OffsetDateTime.now())) {
-                logger.info("The last retrieval was at " + lastRetrieval + ". Retrieving the list.");
-                List<String> list = retrieveAddresses(cloudType);
-                savedAddressList = list;
-                lastRetrieval = OffsetDateTime.now();
+    public AzureServicesAddressResolverImpl(Integer maxAgeInMinutes) {
+        CacheLoader<CloudType, ServiceTagList> allTagListLoader = new CacheLoader<CloudType, ServiceTagList>() {
+            @Override
+            public ServiceTagList load(CloudType key) throws Exception {
+                return getServiceTagList(key);
             }
-        }
-        return savedAddressList;
+        };
+
+        CacheLoader<ServiceCacheKey, List<String>> addressesLoader = new CacheLoader<ServiceCacheKey, List<String>>() {
+            @Override
+            public final List<String> load(final ServiceCacheKey key) throws Exception {
+                return retrieveAddresses(key.getCloudType(), key.getServiceType());
+            }
+        };        
+
+        tagListCache = CacheBuilder.newBuilder().expireAfterWrite(maxAgeInMinutes, TimeUnit.MINUTES)
+                .refreshAfterWrite(maxAgeInMinutes - 1, TimeUnit.MINUTES).build(allTagListLoader);
+
+
+        addressesCache = CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build(addressesLoader);
+        
     }
 
-    private List<String> retrieveAddresses(CloudType cloudType)
-            throws IOException, JsonParseException, JsonMappingException {
+    private ServiceTagList getServiceTagList(CloudType cloudType) throws IOException {
         String downloadPageUrl = getDownloadUrl(cloudType);
         logger.info(String.format("searching into %s to get the address list source", downloadPageUrl));
         String tagListUrl = extractDownloadPageUrl(downloadPageUrl);
         logger.info(String.format("found %s. downloading", tagListUrl));
-        return downloadAddressList(tagListUrl);
+        return retrieveObject(tagListUrl, ServiceTagList.class);
     }
 
-    @Override
-    public List<String> getAfdAddresses() throws IOException {
-        CloudType cloudType = CloudType.valueOf(this.cloud);
-        return getAfdAddresses(cloudType);
-    }
-
-    private List<String> downloadAddressList(String sourceUrl)
-            throws JsonParseException, JsonMappingException, IOException {
-
-        ServiceTagList tagList = this.retrieveObject(sourceUrl, ServiceTagList.class);
-        Optional<ServiceTag> frontDoorBackend = tagList.getValues().stream()
+    private List<String> retrieveAddresses(CloudType cloudType, String serviceType) {
+        ServiceTagList tagList;
+        try {
+            tagList = this.tagListCache.get(cloudType);
+        } catch (ExecutionException e) {
+            logger.error("Error retrieving addresses for " + cloudType + " | " + serviceType, e);
+            return null;
+        }
+        Optional<ServiceTag> serviceTags = tagList.getValues().stream()
                 .filter(serviceTag -> serviceTag.getName().equals(serviceType)).findFirst();
-        if (frontDoorBackend.isPresent()) {
-            return frontDoorBackend.get().getProperties().getAddressPrefixes();
+        if (serviceTags.isPresent()) {
+            return serviceTags.get().getProperties().getAddressPrefixes();
         }
 
-        throw new InvalidParameterException("address not found in " + sourceUrl);
+        throw new InvalidParameterException("addresses for service " + serviceType + " not found");
     }
 
     private <T> T retrieveObject(String endpoint, Class<T> valueType) throws IOException {
@@ -153,6 +149,47 @@ public class AfdAddressResolverImpl implements AfdAddressResolver {
         String downloadPage = String.format("https://www.microsoft.com/en-us/download/confirmation.aspx?id=%s",
                 getDownloadId(cloudType));
         return downloadPage;
+    }
+
+    @Override
+    public List<String> getServiceAddresses(CloudType cloudType, String serviceType) {
+        try {
+            return addressesCache.get(new ServiceCacheKey(cloudType, serviceType));
+        } catch (ExecutionException e) {
+            logger.error("Error on getServiceAddress for " + cloudType + " | " + serviceType, e);
+            return null;
+        }
+    }
+
+    private class ServiceCacheKey {
+        String serviceType;
+        CloudType cloudType;
+
+        ServiceCacheKey(CloudType cloudType, String serviceType) {
+            this.serviceType = serviceType;
+            this.cloudType = cloudType;
+        }
+
+        public String getServiceType() {
+            return serviceType;
+        }
+
+        public CloudType getCloudType() {
+            return cloudType;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null) {
+                return false;
+            }
+            if (obj instanceof ServiceCacheKey) {
+                ServiceCacheKey other = (ServiceCacheKey) obj;
+                return Objects.equals(getServiceType(), other.getServiceType())
+                        && Objects.equals(getCloudType(), other.getCloudType());
+            }
+            return false;
+        }
     }
 
 }

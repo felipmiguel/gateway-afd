@@ -16,6 +16,7 @@
 	<properties>
 		<java.version>8</java.version>
 		<spring-cloud.version>2020.0.3</spring-cloud.version>
+		<guava.version>30.1.1-jre</guava.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -28,6 +29,13 @@
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
+
+		<!-- cache -->
+		<dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

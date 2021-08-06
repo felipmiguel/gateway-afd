@@ -1,18 +1,12 @@
 package com.azurespringcloud.gatewayafd.predicates;
 
-import java.io.IOException;
-import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
 
-import com.azurespringcloud.gatewayafd.service.AfdAddressResolver;
-import com.azurespringcloud.gatewayafd.service.model.CloudType;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.FatalBeanException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.handler.predicate.AbstractRoutePredicateFactory;
 import org.springframework.cloud.gateway.handler.predicate.RemoteAddrRoutePredicateFactory;
 import org.springframework.cloud.gateway.support.ipresolver.XForwardedRemoteAddressResolver;
@@ -69,12 +63,8 @@ public class XForwardedRemoteAddrRoutePredicateFactory
 
     private static final Log log = LogFactory.getLog(XForwardedRemoteAddrRoutePredicateFactory.class);
 
-    @Autowired
-    AfdAddressResolver addressResolver;
-
     public XForwardedRemoteAddrRoutePredicateFactory() {
         super(Config.class);
-
     }
 
     @Override
@@ -94,23 +84,11 @@ public class XForwardedRemoteAddrRoutePredicateFactory
                     + config.getMaxTrustedIndex() + " for " + config.getSources().size() + " source(s)");
         }
 
-        // Reuse the standard RemoteAddrRoutePredicateFactory but instead of using the
-        // default
-        // RemoteAddressResolver to determine the client IP address, use an
-        // XForwardedRemoteAddressResolver.
+        // Reuse the standard RemoteAddrRoutePredicateFactory but instead of using the default
+        // RemoteAddressResolver to determine the client IP address, use an XForwardedRemoteAddressResolver.
         RemoteAddrRoutePredicateFactory.Config wrappedConfig = new RemoteAddrRoutePredicateFactory.Config();
-        List<String> sources;
-        try {
-            sources = addressResolver.getAfdAddresses(CloudType.Azure);
-        } catch (IOException e) {
-            throw new FatalBeanException("Not possible to get sources", e);
-        }
-        if (sources == null) {
-            throw new FatalBeanException("No sources so nothing to configure");
-        }
-        wrappedConfig.setSources(sources);
-        wrappedConfig
-                .setRemoteAddressResolver(XForwardedRemoteAddressResolver.maxTrustedIndex(config.getMaxTrustedIndex()));
+        wrappedConfig.setSources(config.getSources());
+        wrappedConfig.setRemoteAddressResolver(XForwardedRemoteAddressResolver.maxTrustedIndex(config.getMaxTrustedIndex()));
         RemoteAddrRoutePredicateFactory remoteAddrRoutePredicateFactory = new RemoteAddrRoutePredicateFactory();
         Predicate<ServerWebExchange> wrappedPredicate = remoteAddrRoutePredicateFactory.apply(wrappedConfig);
 
@@ -132,14 +110,11 @@ public class XForwardedRemoteAddrRoutePredicateFactory
 
     public static class Config {
 
-        // Trust the last (right-most) value in the X-FORWARDED-FOR header by default,
-        // which
+        // Trust the last (right-most) value in the X-FORWARDED-FOR header by default, which
         // represents the last reverse proxy that was used when calling the gateway.
         private int maxTrustedIndex = 1;
 
-        Log logger = LogFactory.getLog(Config.class);
-
-        private List<String> sources = null;
+        private List<String> sources = new ArrayList<>();
 
         public int getMaxTrustedIndex() {
             return this.maxTrustedIndex;
