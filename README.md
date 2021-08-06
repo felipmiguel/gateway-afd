@@ -39,7 +39,7 @@ spring:
           - XForwardedRemoteAddr="20.103.252.85", "13.73.248.16/29", "20.21.37.40/29", "20.36.120.104/29"
 ```
 ## AzureServiceTagRemoteAddrRoutePredicateFactory
-This factory can be used to filter the traffic allowing only certain addresses comming from Azure Services. This Factory dinamically discovers the list of addresses for Azure Services.
+This factory can be used to filter the traffic allowing only certain addresses coming from Azure Services. This Factory dynamically discovers the list of addresses for Azure Services.
 It can be configured to use different Clouds (Azure, China, AzureGov, GermanyGov) and different Azure Services.
 The address list is retrieved from Microsoft public sites and kept for a configurable amount of time, by default 720 minutes (12 hours).
 
