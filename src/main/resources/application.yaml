@@ -1,8 +1,7 @@
 # SAMPLE
 azurespringcloud:
-  cloud-type: "Azure"
-  max-age-minutes: 720
-  service-type: "AzureFrontDoor.Backend"
+  service-address-discovery:
+    max-age-minutes: 60
 
 
 # Set application level configuration.
